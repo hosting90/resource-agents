@@ -124,7 +124,7 @@ haproxy_monitor() {
 		return $OCF_ERR_CONFIGURED
 	fi
 	
-	if echo "$SRV_STATUS" | grep -q ',UP'; then
+	if echo "$SRV_STATUS" | grep -q -e ',UP' -e ',DOWN'; then
 	    return $OCF_SUCCESS
 	elif echo "$SRV_STATUS" | grep -q ',MAINT'; then
 		return $OCF_NOT_RUNNING
