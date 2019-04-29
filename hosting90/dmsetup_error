@@ -1,0 +1,108 @@
+#!/bin/sh
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+#######################################################################
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="dmsetup_error">
+<version>1.0</version>
+<longdesc lang="en">
+</longdesc>
+<shortdesc lang="en">Error-target resource agent</shortdesc>
+<parameters>
+<parameter name="name" unique="1" required="1">
+<longdesc lang="en">
+Name of the error device.
+</longdesc>
+<shortdesc lang="en">Name</shortdesc>
+</parameter>
+<parameter name="size" unique="1" required="1">
+<longdesc lang="en">
+Size of the error device.
+</longdesc>
+<shortdesc lang="en">Size</shortdesc>
+</parameter>
+</parameters>
+<actions>
+<action name="start"        timeout="20s" />
+<action name="stop"         timeout="20s" />
+<action name="monitor"      timeout="20s" interval="10s" depth="0" />
+<action name="meta-data"    timeout="5s" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+target_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|meta-data}
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+target_start() {
+    target_monitor
+    if [ $? =  $OCF_SUCCESS ]; then
+		return $OCF_SUCCESS
+    fi
+	if dmsetup create "${OCF_RESKEY_name}" --table '0 '"${OCF_RESKEY_size}"' error'; then
+		return $OCF_SUCCESS
+	else
+		return $OCF_ERR_GENERIC
+	fi
+}
+
+target_stop() {
+    target_monitor
+    if [ $? =  $OCF_NOT_RUNNING ]; then
+		return $OCF_SUCCESS
+    fi
+	if dmsetup remove "${OCF_RESKEY_name}"; then
+		return $OCF_SUCCESS
+	else
+		return $OCF_ERR_GENERIC
+	fi
+}
+
+target_monitor() {
+	# Monitor _MUST!_ differentiate correctly between running
+	# (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
+	# That is THREE states, not just yes/no.
+	if dmsetup table --target error "${OCF_RESKEY_name}" | grep -q "${OCF_RESKEY_size}"; then
+		return $OCF_SUCCESS 
+	elif dmsetup table | grep -q "${OCF_RESKEY_name}"; then
+		return $OCF_ERR_GENERIC
+	else
+		return $OCF_NOT_RUNNING
+	fi
+}
+
+: ${OCF_RESKEY_state=${HA_RSCTMP}/Dummy-${OCF_RESOURCE_INSTANCE}.state}
+: ${OCF_RESKEY_fake="dummy"}
+
+case $__OCF_ACTION in
+meta-data)	meta_data
+		exit $OCF_SUCCESS
+		;;
+start)		target_start;;
+stop)		target_stop;;
+monitor)	target_monitor;;
+usage|help)	target_usage
+		exit $OCF_SUCCESS
+		;;
+*)		target_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+rc=$?
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+exit $rc
