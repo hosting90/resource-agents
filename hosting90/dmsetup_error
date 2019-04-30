@@ -25,7 +25,7 @@ Name of the error device.
 </parameter>
 <parameter name="size" unique="1" required="1">
 <longdesc lang="en">
-Size of the error device.
+Size of the error device, either in sectors or in bytes with suffix kKmMgGtT (base is 1024).
 </longdesc>
 <shortdesc lang="en">Size</shortdesc>
 </parameter>
@@ -42,6 +42,31 @@ END
 
 #######################################################################
 
+recalc_size() {
+	sectors="${OCF_RESKEY_size}"
+	if [ -z "$sectors" ]; then
+		return $OCF_SUCCESS
+	fi
+	re_number='^[0-9]+$'
+	re_mult='^[0-9]+[kKmMgGtT]$'
+	if [[ "$sectors" =~ $re_number ]] ; then
+		return $OCF_SUCCESS
+	elif [[ "$sectors" =~ $re_mult  ]] ; then
+		multiplier="${sectors: -1}"
+		sectors="${sectors:0:-1}"
+		case $multiplier in
+			'k'|'K') multiplier=1024;;
+			'm'|'M') multiplier=1048576;;
+			'g'|'G') multiplier=1073741824;;
+			't'|'T') multiplier=1099511627776;;
+		esac
+		sectors=$((sectors*multiplier/512))
+		return $OCF_SUCCESS
+	else
+		return $OCF_ERR_GENERIC
+	fi
+}
+
 target_usage() {
 	cat <<END
 usage: $0 {start|stop|monitor|meta-data}
@@ -54,7 +79,7 @@ target_start() {
     if [ $? =  $OCF_SUCCESS ]; then
 		return $OCF_SUCCESS
     fi
-	if dmsetup create "${OCF_RESKEY_name}" --table '0 '"${OCF_RESKEY_size}"' error'; then
+	if dmsetup create "${OCF_RESKEY_name}" --table '0 '"$sectors"' error'; then
 		return $OCF_SUCCESS
 	else
 		return $OCF_ERR_GENERIC
@@ -77,7 +102,7 @@ target_monitor() {
 	# Monitor _MUST!_ differentiate correctly between running
 	# (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
 	# That is THREE states, not just yes/no.
-	if dmsetup table --target error "${OCF_RESKEY_name}" | grep -q "${OCF_RESKEY_size}"; then
+	if dmsetup table --target error "${OCF_RESKEY_name}" | grep -q "$sectors"; then
 		return $OCF_SUCCESS 
 	elif dmsetup table | grep -q "${OCF_RESKEY_name}"; then
 		return $OCF_ERR_GENERIC
@@ -86,8 +111,11 @@ target_monitor() {
 	fi
 }
 
-: ${OCF_RESKEY_state=${HA_RSCTMP}/Dummy-${OCF_RESOURCE_INSTANCE}.state}
-: ${OCF_RESKEY_fake="dummy"}
+recalc_size
+if [ $? =  $OCF_ERR_GENERIC ]; then
+	ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+	exit $OCF_ERR_GENERIC
+fi
 
 case $__OCF_ACTION in
 meta-data)	meta_data
