@@ -1,0 +1,162 @@
+#!/bin/sh
+#
+#
+#	OneShot OCF RA. 
+#
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+#######################################################################
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="oneshot">
+<version>1.0</version>
+
+<longdesc lang="en">
+Run oneshot command
+</longdesc>
+<shortdesc lang="en">Run oneshot command</shortdesc>
+
+<parameters>
+<parameter name="state" unique="1">
+<longdesc lang="en">
+Location to store the resource state in.
+</longdesc>
+<shortdesc lang="en">State file</shortdesc>
+<content type="string" default="${HA_RSCTMP}/oneshot-${OCF_RESOURCE_INSTANCE}.state" />
+</parameter>
+
+<parameter name="start_command" unique="1">
+<longdesc lang="en">
+Command to run upon start
+</longdesc>
+<shortdesc lang="en">Command to run upon start</shortdesc>
+</parameter>
+
+<parameter name="stop_command" unique="1">
+<longdesc lang="en">
+Command to run upon stop
+</longdesc>
+<shortdesc lang="en">Command to run upon stop</shortdesc>
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"        timeout="20s" />
+<action name="stop"         timeout="20s" />
+<action name="monitor"      timeout="20s" interval="10s" depth="0" />
+<action name="reload"       timeout="20s" />
+<action name="migrate_to"   timeout="20s" />
+<action name="migrate_from" timeout="20s" />
+<action name="meta-data"    timeout="5s" />
+<action name="validate-all"   timeout="20s" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+oneshot_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+oneshot_start() {
+    oneshot_monitor
+    if [ $? =  $OCF_SUCCESS ]; then
+	return $OCF_SUCCESS
+    fi
+	${OCF_RESKEY_start_command}
+	if [ $? -eq 0 ]; then
+		touch ${OCF_RESKEY_state}
+		return $OCF_SUCCESS
+	else
+		return $OCF_ERR_GENERIC
+	fi
+		
+}
+
+oneshot_stop() {
+    oneshot_monitor
+    if [ $? =  $OCF_SUCCESS ]; then
+		rm -f ${OCF_RESKEY_state}
+		# dont check result of stop command
+		${OCF_RESKEY_stop_command}
+    fi
+    return $OCF_SUCCESS
+}
+
+oneshot_monitor() {
+	# Monitor _MUST!_ differentiate correctly between running
+	# (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
+	# That is THREE states, not just yes/no.
+	
+	if [ -f ${OCF_RESKEY_state} ]; then
+	    return $OCF_SUCCESS
+	fi
+	if false ; then
+		return $OCF_ERR_GENERIC
+	fi
+
+	if ! ocf_is_probe && [ "$__OCF_ACTION" = "monitor" ]; then
+		# set exit string only when NOT_RUNNING occurs during an actual monitor operation.
+		ocf_exit_reason "No process state file found"
+	fi
+	return $OCF_NOT_RUNNING
+}
+
+oneshot_validate() {
+    
+    # Is the state directory writable? 
+    state_dir=`dirname "$OCF_RESKEY_state"`
+    touch "$state_dir/$$"
+    if [ $? != 0 ]; then
+	ocf_exit_reason "State file \"$OCF_RESKEY_state\" is not writable"
+	return $OCF_ERR_ARGS
+    fi
+    rm "$state_dir/$$"
+
+    return $OCF_SUCCESS
+}
+
+: ${OCF_RESKEY_state=${HA_RSCTMP}/oneshot-${OCF_RESOURCE_INSTANCE}.state}
+
+case $__OCF_ACTION in
+meta-data)	meta_data
+		exit $OCF_SUCCESS
+		;;
+start)		oneshot_start;;
+stop)		oneshot_stop;;
+monitor)	oneshot_monitor;;
+migrate_to)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrate_target}."
+	        oneshot_stop
+		;;
+migrate_from)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} from ${OCF_RESKEY_CRM_meta_migrate_source}."
+	        oneshot_start
+		;;
+reload)		ocf_log info "Reloading ${OCF_RESOURCE_INSTANCE} ..."
+		;;
+validate-all)	oneshot_validate;;
+usage|help)	oneshot_usage
+		exit $OCF_SUCCESS
+		;;
+*)		oneshot_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+rc=$?
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+exit $rc
+
