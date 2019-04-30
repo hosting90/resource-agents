@@ -1,0 +1,250 @@
+#!/bin/sh
+#
+#
+#	MySQL Query OCF RA allows running arbitrary SQL statements and
+#	decide state based on their output
+#
+# Copyright (c) 2004 Hosting90 Systems s.r.o, Jiri Lunacek
+#                    All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+CRM_MASTER="${HA_SBIN_DIR}/crm_master -l reboot"
+
+#######################################################################
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="mysql-query">
+<version>1.0</version>
+
+<longdesc lang="en">
+
+</longdesc>
+<shortdesc lang="en">MySQL Query resource</shortdesc>
+
+<parameters>
+<parameter name="database" unique="1">
+<longdesc lang="en">
+Database for the query if required
+</longdesc>
+<shortdesc lang="en">Database name</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="stateful" unique="1">
+<longdesc lang="en">
+Started means in master state
+</longdesc>
+<shortdesc lang="en">Stateful</shortdesc>
+<content type="string" default="0" />
+</parameter>
+
+<parameter name="start_query" unique="1" required="1">
+<longdesc lang="en">
+Query to run upon start
+</longdesc>
+<shortdesc lang="en">Start Query</shortdesc>
+</parameter>
+
+<parameter name="stop_query" unique="1">
+<longdesc lang="en">
+Query to run stop, ignore when empty
+</longdesc>
+<shortdesc lang="en">Stop Query</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="monitor_query" unique="1" required="1">
+<longdesc lang="en">
+Query to run upon monitor
+</longdesc>
+<shortdesc lang="en">Monitor Query</shortdesc>
+</parameter>
+
+<parameter name="monitor_running_exp" unique="1" required="1">
+<longdesc lang="en">
+Regular expression to show running state
+</longdesc>
+<shortdesc lang="en">Monitor running regexp</shortdesc>
+</parameter>
+
+<parameter name="monitor_stopped_exp" unique="1" required="1">
+<longdesc lang="en">
+Regular expression to show stopped state
+</longdesc>
+<shortdesc lang="en">Monitor stopped regexp</shortdesc>
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"        timeout="20s" />
+<action name="stop"         timeout="20s" />
+<action name="promote"    timeout="20s" />
+<action name="demote"    timeout="20s" />
+<action name="monitor"      timeout="20s" interval="10s" depth="0" />
+<action name="reload"       timeout="20s" />
+<action name="migrate_to"   timeout="20s" />
+<action name="migrate_from" timeout="20s" />
+<action name="meta-data"    timeout="5s" />
+<action name="validate-all"   timeout="20s" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+mysql_query_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+mysql_query_issue() {
+	mysql -uroot -pOkVJkzVegXC ${OCF_RESKEY_database} --batch --skip-column-names -e "$1"
+	return $?
+}
+
+mysql_query_start() {
+	if [ "${OCF_RESKEY_stateful}" = "1" -a "$1" = "promote" ] || [ "${OCF_RESKEY_stateful}" = "0" -a "$1" = "start" ]; then
+	    mysql_query_monitor
+		MONITOR_RES=$?
+	    if [ $MONITOR_RES =  $OCF_SUCCESS -a "${OCF_RESKEY_stateful}" = "0" ] || [ $MONITOR_RES =  $OCF_RUNNING_MASTER -a "${OCF_RESKEY_stateful}" = "1" ] ; then
+		echo aaa >&2
+			return $OCF_SUCCESS
+	    fi
+		echo "${OCF_RESKEY_start_query}" >&2
+	    RESULT=`mysql_query_issue "${OCF_RESKEY_start_query}"`
+		if [ $? -eq 0 ]; then
+			echo ccc $CRM_MASTER >&2
+			$CRM_MASTER -v 10
+			return $OCF_SUCCESS
+		else
+			return $OCF_ERR_GENERIC
+		fi
+	else
+		echo ddd >&2
+		# ignore start
+		$CRM_MASTER -v 5
+		return $OCF_SUCCESS
+	fi
+}
+
+mysql_query_stop() {
+	if [ "${OCF_RESKEY_stateful}" = "1" -a "$1" = "demote" ] || [ "${OCF_RESKEY_stateful}" = "0" -a "$1" = "stop" ]; then
+		$CRM_MASTER -D
+	    mysql_query_monitor
+	    if [ $? =  $OCF_NOT_RUNNING ]; then
+		echo bbb >&2
+		return $OCF_SUCCESS
+	    fi
+		if [ -z "${OCF_RESKEY_stop_query}" ]; then
+			return $OCF_SUCCESS
+		fi
+		echo aaa >&2
+	    RESULT=`mysql_query_issue "${OCF_RESKEY_stop_query}"`
+		if [ $? -eq 0 ]; then
+			echo ddd >&2
+			$CRM_MASTER -v 5
+			return $OCF_SUCCESS
+		else
+			return $OCF_ERR_GENERIC
+		fi
+	else
+		echo ccc >&2
+		# ignore stop
+		return $OCF_SUCCESS
+	fi
+}
+
+mysql_query_monitor() {
+	# Monitor _MUST!_ differentiate correctly between running
+	# (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
+	# That is THREE states, not just yes/no.
+	RESULT=`mysql_query_issue "${OCF_RESKEY_monitor_query}"`
+	if [ $? -ne 0 ]; then
+		return $OCF_ERR_GENERIC
+	fi
+	if echo "$RESULT" | egrep -q -e "${OCF_RESKEY_monitor_running_exp}"; then
+		if [ "${OCF_RESKEY_stateful}" = "1" ]; then
+			return $OCF_RUNNING_MASTER
+		else
+			return $OCF_SUCCESS
+		fi
+	elif echo "$RESULT" | egrep -q -e "${OCF_RESKEY_monitor_stopped_exp}"; then
+		if [ "${OCF_RESKEY_stateful}" = "1" ]; then
+			# slave
+			return $OCF_SUCCESS
+		else
+			return $OCF_NOT_RUNNING
+		fi
+	else
+		ocf_exit_reason "Query result: $RESULT"
+		return $OCF_ERR_GENERIC
+	fi
+}
+
+mysql_query_validate() {
+	# TODO validate parameters, socket exists?
+
+    return $OCF_SUCCESS
+}
+
+case $__OCF_ACTION in
+meta-data)	meta_data
+		exit $OCF_SUCCESS
+		;;
+start)		mysql_query_start start;;
+stop)		mysql_query_stop stop;;
+promote)	mysql_query_start promote;;
+demote)		mysql_query_stop demote;;
+monitor)	mysql_query_monitor;;
+migrate_to)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrate_target}."
+	        mysql_query_stop
+		;;
+migrate_from)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} from ${OCF_RESKEY_CRM_meta_migrate_source}."
+	        mysql_query_start
+		;;
+reload)		ocf_log info "Reloading ${OCF_RESOURCE_INSTANCE} ..."
+		;;
+validate-all)	mysql_query_validate;;
+usage|help)	mysql_query_usage
+		exit $OCF_SUCCESS
+		;;
+*)		mysql_query_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+rc=$?
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+exit $rc
+
