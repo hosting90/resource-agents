@@ -47,6 +47,13 @@ Command to run upon stop
 <shortdesc lang="en">Command to run upon stop</shortdesc>
 </parameter>
 
+<parameter name="monitor_command" unique="1">
+<longdesc lang="en">
+Command to run upon monitor
+</longdesc>
+<shortdesc lang="en">Command to run upon monitor</shortdesc>
+</parameter>
+
 </parameters>
 
 <actions>
@@ -104,7 +111,16 @@ oneshot_monitor() {
 	# That is THREE states, not just yes/no.
 	
 	if [ -f ${OCF_RESKEY_state} ]; then
-	    return $OCF_SUCCESS
+		if [ -z "${OCF_RESKEY_monitor_command}" ]; then
+			return $OCF_SUCCESS
+		else
+			${OCF_RESKEY_monitor_command}
+			if [ $? -eq 0 ]; then
+				return $OCF_SUCCESS
+			else
+				return $OCF_ERR_GENERIC
+			fi
+		fi
 	fi
 	if false ; then
 		return $OCF_ERR_GENERIC
