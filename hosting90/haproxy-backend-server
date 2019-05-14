@@ -119,6 +119,11 @@ haproxy_monitor() {
 	# Monitor _MUST!_ differentiate correctly between running
 	# (SUCCESS), failed (ERROR) or _cleanly_ stopped (NOT RUNNING).
 	# That is THREE states, not just yes/no.
+	
+	if [ -z "`echo "show stat" | socat stdio ${OCF_RESKEY_socket} | grep BACKEND`" ]; then
+		return $OCF_NOT_RUNNING
+	fi
+	
 	SRV_STATUS=`echo "show stat" | socat stdio ${OCF_RESKEY_socket} | egrep "^$(echo ${OCF_RESKEY_server_id} | sed 's/\//,/'),"`
 	if [ -z "$SRV_STATUS" ]; then
 		return $OCF_ERR_CONFIGURED
