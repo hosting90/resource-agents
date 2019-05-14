@@ -65,6 +65,20 @@ Started means in master state
 <content type="string" default="0" />
 </parameter>
 
+<parameter name="mysql_user" unique="1">
+<longdesc lang="en">
+MySQL user
+</longdesc>
+<shortdesc lang="en">MySQL user</shortdesc>
+</parameter>
+
+<parameter name="mysql_password" unique="1">
+<longdesc lang="en">
+MySQL password
+</longdesc>
+<shortdesc lang="en">MySQL password</shortdesc>
+</parameter>
+
 <parameter name="start_query" unique="1" required="1">
 <longdesc lang="en">
 Query to run upon start
@@ -130,7 +144,7 @@ END
 }
 
 mysql_query_issue() {
-	mysql -uroot -pOkVJkzVegXC ${OCF_RESKEY_database} --batch --skip-column-names -e "$1"
+	mysql $([ -n "${OCF_RESKEY_mysql_user}" ] && echo "-u${OCF_RESKEY_mysql_user}") $([ -n "${OCF_RESKEY_mysql_password}" ] && echo "-p${OCF_RESKEY_mysql_password}") ${OCF_RESKEY_database} --batch --skip-column-names -e "$1"
 	return $?
 }
 
