@@ -516,6 +516,10 @@ iSCSILogicalUnit_stop() {
 			done
 		fi
 
+		# if backstore does not exist, return success
+		# we have nothing to delete
+		ocf_run -warn targetcli /backstores/$backstore_type/${OCF_RESOURCE_INSTANCE} status >/dev/null || return $OCF_SUCCESS
+
 		# If we've proceeded down to here and we're unable to
 		# delete the backstore, then something is seriously
 		# wrong and we need to fail the stop operation
