@@ -85,7 +85,7 @@ oneshot_start() {
     if [ $? =  $OCF_SUCCESS ]; then
 	return $OCF_SUCCESS
     fi
-	${OCF_RESKEY_start_command}
+	bash -c "${OCF_RESKEY_start_command}"
 	if [ $? -eq 0 ]; then
 		touch ${OCF_RESKEY_state}
 		return $OCF_SUCCESS
@@ -100,7 +100,7 @@ oneshot_stop() {
     if [ $? =  $OCF_SUCCESS ]; then
 		rm -f ${OCF_RESKEY_state}
 		# dont check result of stop command
-		${OCF_RESKEY_stop_command}
+		bash -c "${OCF_RESKEY_stop_command}"
     fi
     return $OCF_SUCCESS
 }
@@ -114,7 +114,7 @@ oneshot_monitor() {
 		if [ -z "${OCF_RESKEY_monitor_command}" ]; then
 			return $OCF_SUCCESS
 		else
-			${OCF_RESKEY_monitor_command}
+			bash -c "${OCF_RESKEY_monitor_command}"
 			if [ $? -eq 0 ]; then
 				return $OCF_SUCCESS
 			else
