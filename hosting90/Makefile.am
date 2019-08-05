@@ -32,7 +32,8 @@ ocfdir		        = $(OCF_RA_DIR_PREFIX)/hosting90
 ocf_SCRIPTS	      = dmsetup_error \
                     haproxy-backend-server \
                     mysql-query \
-                    oneshot
+                    oneshot \
+                    glusterfs-volume
 
 ocfcommondir		= $(OCF_LIB_DIR_PREFIX)/heartbeat
 
