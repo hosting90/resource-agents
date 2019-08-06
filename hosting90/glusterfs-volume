@@ -122,6 +122,10 @@ volume_getpids() {
 
     volpid_dir=`volume_getpid_dir`
     bricks=`volume_getbricks`
+    
+    if [ -z "$bricks" ]; then
+        return 1
+    fi
 
     for brick in ${bricks}; do
 	pidfile="${volpid_dir}/${SHORTHOSTNAME}${brick}.pid"
