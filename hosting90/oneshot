@@ -81,11 +81,11 @@ END
 }
 
 oneshot_start() {
-    oneshot_monitor
-    if [ $? =  $OCF_SUCCESS ]; then
-	return $OCF_SUCCESS
-    fi
-	bash -c "${OCF_RESKEY_start_command}"
+	oneshot_monitor
+	if [ $? =  $OCF_SUCCESS ]; then
+		return $OCF_SUCCESS
+	fi
+	printf "%s" "${OCF_RESKEY_start_command}" | bash
 	if [ $? -eq 0 ]; then
 		touch ${OCF_RESKEY_state}
 		return $OCF_SUCCESS
@@ -96,13 +96,13 @@ oneshot_start() {
 }
 
 oneshot_stop() {
-    oneshot_monitor
-    if [ $? =  $OCF_SUCCESS ]; then
+	oneshot_monitor
+	if [ $? =  $OCF_SUCCESS ]; then
 		rm -f ${OCF_RESKEY_state}
 		# dont check result of stop command
-		bash -c "${OCF_RESKEY_stop_command}"
-    fi
-    return $OCF_SUCCESS
+		printf "%s"  "${OCF_RESKEY_stop_command}" | bash
+	fi
+	return $OCF_SUCCESS
 }
 
 oneshot_monitor() {
@@ -114,7 +114,7 @@ oneshot_monitor() {
 		if [ -z "${OCF_RESKEY_monitor_command}" ]; then
 			return $OCF_SUCCESS
 		else
-			bash -c "${OCF_RESKEY_monitor_command}"
+			printf "%s" "${OCF_RESKEY_monitor_command}" | bash
 			if [ $? -eq 0 ]; then
 				return $OCF_SUCCESS
 			else
@@ -134,17 +134,17 @@ oneshot_monitor() {
 }
 
 oneshot_validate() {
-    
-    # Is the state directory writable? 
-    state_dir=`dirname "$OCF_RESKEY_state"`
-    touch "$state_dir/$$"
-    if [ $? != 0 ]; then
+	
+	# Is the state directory writable? 
+	state_dir=`dirname "$OCF_RESKEY_state"`
+	touch "$state_dir/$$"
+	if [ $? != 0 ]; then
 	ocf_exit_reason "State file \"$OCF_RESKEY_state\" is not writable"
 	return $OCF_ERR_ARGS
-    fi
-    rm "$state_dir/$$"
+	fi
+	rm "$state_dir/$$"
 
-    return $OCF_SUCCESS
+	return $OCF_SUCCESS
 }
 
 : ${OCF_RESKEY_state=${HA_RSCTMP}/oneshot-${OCF_RESOURCE_INSTANCE}.state}
@@ -157,10 +157,10 @@ start)		oneshot_start;;
 stop)		oneshot_stop;;
 monitor)	oneshot_monitor;;
 migrate_to)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrate_target}."
-	        oneshot_stop
+			oneshot_stop
 		;;
 migrate_from)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} from ${OCF_RESKEY_CRM_meta_migrate_source}."
-	        oneshot_start
+			oneshot_start
 		;;
 reload)		ocf_log info "Reloading ${OCF_RESOURCE_INSTANCE} ..."
 		;;
