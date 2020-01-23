@@ -30,6 +30,7 @@ halibdir		= $(libexecdir)/heartbeat
 ocfdir		        = $(OCF_RA_DIR_PREFIX)/hosting90
 
 ocf_SCRIPTS	      = dmsetup_error \
+                    DummyContent \
                     haproxy-backend-server \
                     mysql-query \
                     oneshot \
