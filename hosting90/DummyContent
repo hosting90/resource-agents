@@ -76,6 +76,14 @@ Content of the state file
 <content type="string" default="" />
 </parameter>
 
+<parameter name="mode" unique="1">
+<longdesc lang="en">
+File mode
+</longdesc>
+<shortdesc lang="en">Mode</shortdesc>
+<content type="string" default="0640" />
+</parameter>
+
 <parameter name="fake" unique="0">
 <longdesc lang="en">
 Fake attribute that can be changed to cause a reload
@@ -119,6 +127,7 @@ dummy_start() {
 		echo "${OCF_RESKEY_content}" > ${OCF_RESKEY_state}
 	fi
     touch ${OCF_RESKEY_state}
+	chmod ${OCF_RESKEY_mode} ${OCF_RESKEY_state}
 }
 
 dummy_stop() {
