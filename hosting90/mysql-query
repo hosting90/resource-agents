@@ -206,7 +206,7 @@ mysql_query_monitor() {
 	# That is THREE states, not just yes/no.
 	RESULT=`mysql_query_issue "${OCF_RESKEY_monitor_query}"`
 	if [ $? -ne 0 ]; then
-		return $OCF_ERR_GENERIC
+		return $OCF_NOT_RUNNING
 	fi
 	if echo "$RESULT" | egrep -q -e "${OCF_RESKEY_monitor_running_exp}"; then
 		if [ "${OCF_RESKEY_stateful}" = "1" ]; then
